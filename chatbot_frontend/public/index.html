@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crustdata Support Chatbot</title>
+    <style>
+        .chat-box { max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 10px; }
+        .chat-log { height: 300px; overflow-y: auto; border-bottom: 1px solid #ddd; }
+        .chat-message { margin: 10px 0; }
+        .user-message { font-weight: bold; }
+        .bot-message { color: #0078D7; }
+    </style>
+  </head>
+  <body>
+      <div class="chat-box">
+          <h3>Crustdata API Support Chat</h3>
+          <div id="chat-log" class="chat-log"></div>
+          <input id="user-input" type="text" placeholder="Ask a question..." />
+          <button onclick="sendMessage()">Send</button>
+      </div>
+      <script>
+          const faq = {
+              "What is the Crustdata API rate limit?": "The Crustdata API rate limit is 1000 requests per minute.",
+              "How can I authenticate with the Crustdata API?": "You can authenticate using an API key. Simply pass it as a bearer token in the request header.",
+              "What are the supported file formats for data upload?": "The Crustdata API supports CSV, JSON, and Parquet formats for data uploads."
+          };
+
+          async function sendMessage() {
+              const userInput = document.getElementById("user-input").value.trim();
+              if (!userInput) return;
+
+              const chatLog = document.getElementById("chat-log");
+              chatLog.innerHTML += `<div class='chat-message user-message'>You: ${userInput}</div>`;
+              document.getElementById("user-input").value = "";
+
+              try {
+                  const response = await fetch('http://127.0.0.1:5000/chat', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ message: userInput })
+                  });
+                  const data = await response.json();
+                  chatLog.innerHTML += `<div class='chat-message bot-message'>Bot: ${data.answer}</div>`;
+              } catch (error) {
+                  chatLog.innerHTML += `<div class='chat-message bot-message'>Bot: An error occurred. Please try again later.</div>`;
+              }
+
+              chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to the bottom
+          }
+
+      </script>
+  </body>
+</html>
