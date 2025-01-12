@@ -13,7 +13,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
-CORS(app, resources={r"/chat": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/chat": {"origins": ["https://crustdata-chatbot-frontend-oxzkpajbw-ankita-shanbhags-projects.vercel.app", "https://crustdata-chatbot-frontend.vercel.app"]}})
 
 # In-memory conversation history (single user demo).
 # In production, store per-user data in a DB or session.
