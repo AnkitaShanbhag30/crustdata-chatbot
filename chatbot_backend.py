@@ -71,8 +71,8 @@ def chat():
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history
 
     try:
-        # 3) Call the OpenAI ChatCompletion API with the entire conversation
-        response = openai.ChatCompletion.create(
+        # 3) Call the OpenAI chat.completions API with the entire conversation
+        response = openai.chat.completions.create(
             model="gpt-4",  # or "gpt-3.5-turbo"
             messages=messages,
             max_tokens=500
