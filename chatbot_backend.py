@@ -13,7 +13,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
-CORS(app, resources={r"/chat": {"origins": ["https://crustdata-chatbot-frontend-oxzkpajbw-ankita-shanbhags-projects.vercel.app", "https://crustdata-chatbot-frontend.vercel.app"]}})
+CORS(app, resources={r"/chat": {"origins": ["https://crustdata-chatbot-frontend.vercel.app"]}})
 
 # In-memory conversation history (single user demo).
 # In production, store per-user data in a DB or session.
@@ -72,7 +72,7 @@ def chat():
 
     try:
         # 3) Call the OpenAI ChatCompletion API with the entire conversation
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",  # or "gpt-3.5-turbo"
             messages=messages,
             max_tokens=500
@@ -94,4 +94,6 @@ def chat():
     return jsonify({"answer": validated_answer})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Bind to the PORT provided by Heroku
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)

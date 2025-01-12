@@ -1,1 +1,1 @@
-web: python chatbot_backend.py
+web: gunicorn chatbot_backend:app
