@@ -43,10 +43,10 @@ marshmallow-sqlalchemy==1.0.0
 matplotlib-inline==0.1.7
 multidict==6.0.5
 nest-asyncio==1.6.0
-numpy==1.26.4
+numpy==1.24.3
 openai==1.59.3
 packaging==24.0
-pandas==2.2.2
+pandas==2.1.1
 parso==0.8.4
 pexpect==4.9.0
 platformdirs==4.2.1
