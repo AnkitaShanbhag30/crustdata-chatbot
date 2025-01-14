@@ -1,26 +1,33 @@
 import re
 import requests
 import json
-import logging  # For error logs
+import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import openai
 import os
 from dotenv import load_dotenv
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 
-# Load .env file to get the OpenAI API key
+# Load environment variables
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
+# Flask app setup
 app = Flask(__name__)
 CORS(app, resources={r"/chat": {"origins": ["https://crustdata-chatbot-frontend.vercel.app"]}})
-
-# In-memory conversation history (single user demo).
-# In production, store per-user data in a DB or session.
-conversation_history = []
+# CORS(app, resources={r"/chat": {"origins": ["http://localhost:3000", "http://192.168.1.72:8000", "https://crustdata-chatbot-frontend.vercel.app"]}})
+# LangChain setup
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model="gpt-4")
+# conversation_chain = ConversationChain(llm=llm, memory=memory)
 
 SYSTEM_PROMPT = """
-You are a helpful assistant for Crustdata's API support. 
+You are a helpful assistant for Crustdata's API support.
 Use the following references for answers:
 
 1. API Docs: https://www.notion.so/crustdata/Crustdata-Discovery-And-Enrichment-API-c66d5236e8ea40df8af114f6d447ab48
@@ -28,12 +35,14 @@ Use the following references for answers:
 
 Answer user questions clearly and concisely, and provide example API requests when necessary. Reference specific URLs as appropriate.
 """
+template = SYSTEM_PROMPT + "\n\n{chat_history}\nUser: {input}\nAssistant:"
+prompt = PromptTemplate(input_variables=["input", "chat_history"], template=template)
+conversation_chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
 
 def validate_api_examples(answer_text: str) -> str:
     """
     Look for API request examples in the answer_text.
     If found, try to validate them. If validation fails, remove or modify them.
-    For simplicity, this example just searches for lines containing 'GET', 'POST', or 'curl'.
     """
     lines = answer_text.splitlines()
     validated_lines = []
@@ -64,36 +73,18 @@ def chat():
     if not user_input:
         return jsonify({"error": "No message provided"}), 400
 
-    # 1) Append the user's message to the in-memory conversation
-    conversation_history.append({"role": "user", "content": user_input})
-
-    # 2) Construct the full message list: system prompt + entire conversation history
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history
-
     try:
-        # 3) Call the OpenAI chat.completions API with the entire conversation
-        response = openai.chat.completions.create(
-            model="gpt-4",  # or "gpt-3.5-turbo"
-            messages=messages,
-            max_tokens=500
-        )
-    except openai.error.OpenAIError as e:
-        logging.error(f"OpenAI error occurred: {e}")
-        return jsonify({"error": "OpenAI API Error occurred. Check server logs for details."}), 500
+        # LangChain: Generate response and maintain conversation history
+        assistant_response = conversation_chain.run(input=user_input)
 
-    # 4) Extract the assistant's answer
-    raw_answer = response.choices[0].message.content.strip()
+        # Validate API examples in the response
+        validated_answer = validate_api_examples(assistant_response)
 
-    # 5) (Optional) Validate any API-call examples
-    validated_answer = validate_api_examples(raw_answer)
-
-    # 6) Append the assistant's reply to the conversation history
-    conversation_history.append({"role": "assistant", "content": validated_answer})
-
-    # Return the final answer to the user
-    return jsonify({"answer": validated_answer})
+        return jsonify({"answer": validated_answer})
+    except Exception as e:
+        logging.error(f"Error during chat: {e}")
+        return jsonify({"error": "An internal server error occurred."}), 500
 
 if __name__ == "__main__":
-    # Bind to the PORT provided by Heroku
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=True)
