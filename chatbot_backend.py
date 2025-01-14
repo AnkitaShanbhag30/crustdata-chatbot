@@ -19,12 +19,11 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 
 # Flask app setup
 app = Flask(__name__)
-CORS(app, resources={r"/chat": {"origins": ["https://crustdata-chatbot-frontend.vercel.app"]}})
-# CORS(app, resources={r"/chat": {"origins": ["http://localhost:3000", "http://192.168.1.72:8000", "https://crustdata-chatbot-frontend.vercel.app"]}})
+CORS(app, resources={r"/chat": {"origins": ["https://crustdata-chatbot-frontend.vercel.app"]}}, supports_credentials=True)
+
 # LangChain setup
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model="gpt-4")
-# conversation_chain = ConversationChain(llm=llm, memory=memory)
 
 SYSTEM_PROMPT = """
 You are a helpful assistant for Crustdata's API support.
@@ -67,23 +66,42 @@ def validate_api_examples(answer_text: str) -> str:
 
     return "\n".join(validated_lines)
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    user_input = request.json.get("message")
-    if not user_input:
-        return jsonify({"error": "No message provided"}), 400
-
+def validate_api_request(api_url, headers, payload):
     try:
-        # LangChain: Generate response and maintain conversation history
-        assistant_response = conversation_chain.run(input=user_input)
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        return True, response.json()
+    except requests.exceptions.RequestException as e:
+        return False, str(e)
 
-        # Validate API examples in the response
-        validated_answer = validate_api_examples(assistant_response)
+@app.route('/chat', methods=['OPTIONS', 'POST'])
+def chatbot():
+    if request.method == 'OPTIONS':
+        return build_cors_preflight_response()
+    elif request.method == 'POST':
+        user_input = request.json.get('input')
+        # Generate API request example based on user input
+        api_url = "https://api.example.com/data"
+        headers = {"Authorization": f"Bearer {openai_api_key}"}
+        payload = {"query": user_input}
 
-        return jsonify({"answer": validated_answer})
-    except Exception as e:
-        logging.error(f"Error during chat: {e}")
-        return jsonify({"error": "An internal server error occurred."}), 500
+        # Validate the API request
+        is_valid, result = validate_api_request(api_url, headers, payload)
+        if is_valid:
+            return jsonify({"response": "API request is valid", "data": result})
+        else:
+            return jsonify({"response": "API request validation failed", "error": result}), 400
+
+def build_cors_preflight_response():
+    response = jsonify({'status': 'success'})
+    response.headers.add("Access-Control-Allow-Origin", "https://crustdata-chatbot-frontend.vercel.app")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
+    return response
+
+def corsify_actual_response(response):
+    response.headers.add("Access-Control-Allow-Origin", "https://crustdata-chatbot-frontend.vercel.app")
+    return response
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
